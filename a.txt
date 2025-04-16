@@ -1,2 +1,594 @@
-hell i 
- am 
+How JWT Works
+User Logs In:
+
+The user provides their username and password.
+
+If the credentials are correct, the server creates a JWT containing user information (e.g., user ID, role) and signs it with a secret key.
+
+Token Sent to Client:
+
+The JWT is sent back to the client, usually stored in the browser (local storage, session storage) or mobile app.
+
+Token Sent with Requests:
+
+For every request to a protected resource, the client includes the JWT in the HTTP header:
+
+Authorization: Bearer <token>
+
+Server Verifies Token:
+
+The server checks the JWT to ensure it hasn’t been tampered with and confirms the user’s identity.
+This is a key concept in JWT (JSON Web Token) authentication. Here's how the server validates the JWT:
+
+Structure of JWT: A JWT consists of three parts:
+
+Header: Specifies the algorithm used for signing (e.g., HS256, RS256).
+
+Payload: Contains claims or data, such as user ID or roles.
+
+Signature: Ensures the token's integrity.
+
+Server's Validation Process:
+
+Decoding the JWT: The server decodes the token using the secret key (if using HMAC) or the public key (if using RSA).
+
+Validating the Signature: The server re-generates the signature based on the header and payload using the secret or public key. It compares this with the signature in the JWT to verify that the token hasn’t been altered.
+
+Checking Expiry: The server checks the exp claim to ensure the token is still valid and hasn’t expired.
+
+Validating Claims: The server ensures that required claims (e.g., iss, aud) match expected values.
+
+Confirming User Identity: Once the JWT passes validation, the server trusts the claims in the payload (e.g., user ID) to identify the user.
+
+
+Access Granted:
+
+If the JWT is valid, the server allows the requested action (e.g., view profile, place an order).
+
+What is Stateless?
+In computing, stateless refers to a system or process that does not retain any information (state) about a user's session or previous interactions. Every request from the client is treated as a new, independent request, with no connection to past requests.
+
+Example of Statelessness
+Stateless Interaction:
+
+A client sends a request to an API endpoint with a JWT in the header.
+
+The server validates the token, processes the request, and sends back a response.
+
+The server does not keep any information about the client or the request after sending the response.
+
+Each request is independent and complete in itself.
+
+Advantages of Stateless Systems
+Scalability:
+
+Since the server doesn't need to store user data, it can handle more clients and scale more easily.
+
+Fault Tolerance:
+
+If one server fails, another can handle the request without requiring shared session data. 
+
+
+
+
+Method-level security in Spring Boot is a way to enforce authorization checks directly at the method level. This provides a more granular level of security than traditional URL-based security, allowing you to apply security policies to specific methods in your service or controller classes based on roles, permissions, or other criteria.
+
+Types of Method-Level Security in Spring Security:
+@PreAuthorize: Check the security of the method before it is executed.
+
+@Secured: Declare a role-based access control at the method level.
+
+@PostAuthorize: Check security after the method has been executed.
+
+@RolesAllowed: Similar to @Secured, but more general.
+
+1. @PreAuthorize
+Description: The @PreAuthorize annotation is used to specify that security checks should be made before the method is executed. The expression provided in @PreAuthorize defines the conditions under which the method can be invoked. It's typically used to check if a user has the necessary permissions or roles before executing a method.
+
+Usage: You can use SpEL (Spring Expression Language) to define complex security rules, such as checking roles, authorities, or specific attributes of the authenticated user.
+
+Example:
+
+
+@PreAuthorize("hasRole('ADMIN')")
+public void deleteUser(String userId) {
+    // Code to delete a user
+}
+In this example, the deleteUser method will only be executed if the authenticated user has the role ADMIN.
+
+More Complex Example:
+
+
+@PreAuthorize("hasRole('ADMIN') or #userId == authentication.name")
+public void updateUser(String userId, User user) {
+    // Code to update user
+}
+In this case, the method can be executed if the user has the ADMIN role or if the user ID matches the authenticated user's name.
+
+2. @Secured
+Description: The @Secured annotation is simpler compared to @PreAuthorize. It allows you to specify a list of roles or authorities that are required to invoke the method. It’s often used when you only need role-based access control and don’t need the flexibility of SpEL expressions.
+
+Usage: You specify roles directly in the annotation as an array of strings.
+
+Example:
+
+@Secured({"ROLE_ADMIN", "ROLE_MANAGER"})
+public void createReport() {
+    // Code to create a report
+}
+
+
+
+3. @PostAuthorize
+Description: The @PostAuthorize annotation checks the security after the method has been executed. It’s typically used when you want to enforce security based on the result of the method (e.g., if the method returns an object, the security check can be performed on that object).
+
+Usage: @PostAuthorize uses SpEL expressions to evaluate whether the returned result meets the security requirements after the method is executed.
+
+Example:
+
+@PostAuthorize("returnObject.owner == authentication.name")
+public User getUserById(String userId) {
+    // Code to retrieve a user by ID
+    return userService.findUserById(userId);
+}
+In this example, after the getUserById method executes, Spring Security will check if the owner property of the returned User object matches the authenticated user's name. If not, an AccessDeniedException will be thrown.
+
+
+
+4. @RolesAllowed
+Description: The @RolesAllowed annotation is similar to @Secured, but it is more general and is part of the JSR-250 specification. It allows you to specify roles or authorities required to invoke a method.
+
+Usage: You list the roles directly in the annotation. Unlike @Secured, @RolesAllowed does not use the ROLE_ prefix by default. It is also more compatible with different security frameworks.
+
+Example:
+
+
+@RolesAllowed({"ADMIN", "USER"})
+public void viewProfile(String userId) {
+    // Code to view a user's profile
+}
+In this example, the viewProfile method can be executed by users with the roles ADMIN or USER.
+To use these annotations in Spring, you need to enable method-level security by adding @EnableGlobalMethodSecurity in your configuration class:
+
+
+
+
+
+
+When handling expired JWT tokens in a Spring Boot application, I follow a structured approach to ensure both security and usability. Here's how I would explain it during an interview:
+
+Step 1: Check Token Validity
+The first step is to validate the JWT in a filter or middleware during each request. This includes verifying:
+
+The token's signature.
+
+The exp (expiration) claim.
+
+If the token is expired, I ensure that the system doesn't reject the request outright but provides a user-friendly mechanism to handle it.
+
+Step 2: Implement Token Expiration Handling
+When a JWT is detected as expired, there are two common approaches:
+
+A. Use Refresh Tokens (Best Practice)
+Why Refresh Tokens?
+
+Access tokens (JWTs) are typically short-lived for security reasons.
+
+A long-lived refresh token allows users to get a new access token without re-authenticating.
+
+How Refresh Tokens Work?
+Here’s how the process works step-by-step:
+
+1. Initial Login
+The user logs in using their credentials (e.g., username/password).
+
+The server generates:
+
+An access token (short-lived, e.g., 15 minutes).
+
+A refresh token (long-lived, e.g., 7 days).
+
+The access token is sent in the Authorization header for each API request, and the refresh token is stored securely.
+
+2. When the Access Token Expires
+The client detects that the access token has expired (e.g., server returns a 401 Unauthorized response).
+
+Instead of asking the user to log in again, the client sends the refresh token to a specific API endpoint (/refresh) to get a new access token.
+
+3. Server Validates the Refresh Token
+The server checks if the refresh token:
+
+Is valid (not tampered with).
+
+Is not expired.
+
+Is not revoked (if token revocation is implemented).
+
+If the refresh token is valid:
+
+The server issues a new access token (and optionally a new refresh token).
+  @PostMapping("/refresh-token")
+    public ResponseEntity<?> refreshAccessToken(@RequestBody RefreshTokenRequest request) {
+        String refreshToken = request.getRefreshToken();
+
+        if (jwtService.validateToken(refreshToken)) {
+            String username = jwtService.getUsername(refreshToken);
+
+            // Generate new access token
+            String newAccessToken = jwtService.generateAccessToken(username);
+
+            return ResponseEntity.ok(new TokenResponse(newAccessToken, refreshToken));
+        } else {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid or expired refresh token");
+        }
+    }
+}
+
+
+
+4. Client Stores the New Access Token
+The new access token replaces the expired one, and the client resumes normal API requests.
+
+
+
+
+3. Example Flow
+A user logs in, and their roles (e.g., ADMIN, USER) are encoded in the JWT.
+
+For every request:
+
+The JWT is validated.
+
+Roles are extracted and set in the SecurityContext.
+
+Spring Security checks the user's roles against endpoint requirements.
+
+
+
+
+Role-Based Access Control (RBAC) Implementation in Spring Security with JWT:
+User Login & JWT Generation:
+
+When the user logs in (typically with their username and password), the application generates a JWT token. This token contains various claims, one of which is the username, which identifies the user. Other claims can include roles and additional user-specific information.
+
+The JWT token is signed using a secret key (HMAC256 in your case) to ensure its integrity and security. The generated token also has an expiration time to ensure it is valid only for a certain period.
+
+Client Sends JWT Token in Requests:
+
+After login, the client (usually a frontend or mobile app) receives the JWT token and stores it (typically in local storage, session storage, or HTTP-only cookies).
+
+For every subsequent request to the server, the client includes the JWT token in the Authorization header of the HTTP request, typically formatted as Authorization: Bearer <token>.
+
+JWT Validation by the JWTFilter:
+
+On the server side, the incoming request with the JWT token is intercepted by the JWTFilter class. This filter extracts the token from the Authorization header.
+
+The JWTFilter calls the JWTService to validate the token. The token is verified using the HMAC256 algorithm and the predefined issuer.
+
+If the token is valid, the JWTFilter extracts the username from the JWT claims and uses it to load the user’s details (including their roles) from the database. This is done through the UserRepository interface.
+
+Setting Authentication in the SecurityContext:
+
+Once the user’s information (username and roles) is retrieved, the filter creates a UsernamePasswordAuthenticationToken. This token contains the user’s identity and role(s), and it is placed in the SecurityContextHolder.
+
+This step ensures that the user’s identity is now available within the Spring Security context for the rest of the request processing cycle. This authentication information is used later for authorization checks.
+
+Role-based Access Control (RBAC) Using Spring Security:
+
+Now that the user is authenticated, RBAC (Role-Based Access Control) is enforced. In your Spring Security configuration, this is achieved through route-based access control.
+
+You use methods like hasRole("CONTENTMANAGER") to specify which roles are allowed to access certain endpoints. For example, in the SecurityConfig class, only users with the CONTENTMANAGER role can access the /api/v2/cars/add-car endpoint.
+
+When the server processes the request, Spring Security checks if the user’s role (retrieved during the token validation) matches the required role for the specific endpoint.
+
+If the user has the necessary role, they are allowed access to the resource. If not, access is denied with a 403 Forbidden response.
+
+Conclusion of RBAC Implementation:
+
+This setup provides stateless authentication through JWT, ensuring that each request is authenticated and authorized based on the user's identity and roles.
+
+RBAC is implemented effectively using role-specific checks in your Spring Security configuration, ensuring that only users with the appropriate roles can access specific resources in your application.
+
+
+
+
+JWT-based authentication is widely used but comes with specific vulnerabilities. Here are some common ones and ways to mitigate them:
+
+1. Lack of Token Expiration
+Vulnerability: Long-lived tokens increase the risk of misuse if they are stolen.
+
+Mitigation:
+
+Use short-lived access tokens (e.g., 15 minutes).
+
+Implement refresh tokens to issue new access tokens securely.
+
+2. Weak Secret Key
+Vulnerability: Using a weak or predictable secret key makes the token easy to forge.
+
+Mitigation:
+
+Use a strong, random secret key for signing tokens.
+
+Rotate secret keys periodically to reduce exposure.
+
+
+
+
+
+
+
+
+Implementing logout functionality in a JWT-based system can be a bit tricky because JWTs are stateless. Unlike session-based authentication, where you can simply invalidate the session on the server, JWTs remain valid until they expire.
+
+Here’s how you can implement logout functionality step by step:
+
+1. Understand the Problem
+Once a JWT is issued, the server cannot "revoke" it because it doesn't store the token.
+
+A client can continue using a valid JWT until it expires, even after logging out.
+
+2. Common Solutions
+A. Use a Token Blacklist
+What It Means:
+
+Maintain a list of "blacklisted" tokens on the server.
+
+When a user logs out, their JWT is added to this list.
+
+For every request, check if the token is blacklisted.
+
+
+
+
+
+
+
+
+                                       MODULE 2   Car Evaluation Booking for Sellers
+How would you handle API rate-limiting to ensure the system isn’t overwhelmed by too many requests from a seller, especially during peak hours?
+
+package cp.service;
+
+import org.springframework.stereotype.Service;
+
+import java.util.HashMap;
+import java.util.Map;
+
+@Service
+public class RateLimiterService {
+
+    // Store user request count and the time when the window started
+    private final Map<String, UserRequestInfo> userRequests = new HashMap<>();
+    private static final int MAX_REQUESTS = 100; // Max requests per time window
+    private static final long TIME_WINDOW = 60000; // 1 minute (60,000 milliseconds)
+
+    // Checks if the user has exceeded the request limit within the time window
+    public boolean isRequestAllowed(String userId) {
+        long currentTime = System.currentTimeMillis();
+
+        // If the user has no entry or window expired, initialize a new entry
+        userRequests.putIfAbsent(userId, new UserRequestInfo(0, currentTime));
+
+        UserRequestInfo userRequestInfo = userRequests.get(userId);
+
+        // If the time window has passed, reset the counter and timestamp
+        if (currentTime - userRequestInfo.getTimestamp() > TIME_WINDOW) {
+            userRequestInfo.setCount(0);
+            userRequestInfo.setTimestamp(currentTime);
+        }
+
+        // Check if the user has exceeded the allowed request limit
+        if (userRequestInfo.getCount() >= MAX_REQUESTS) {
+            return false; // Exceeded rate limit
+        }
+
+        // Otherwise, increment the count and allow the request
+        userRequestInfo.incrementCount();
+        return true;
+    }
+
+    // Inner class to store request count and timestamp
+    private static class UserRequestInfo {
+        private int count;
+        private long timestamp;
+
+        public UserRequestInfo(int count, long timestamp) {
+            this.count = count;
+            this.timestamp = timestamp;
+        }
+
+        public int getCount() {
+            return count;
+        }
+
+        public void setCount(int count) {
+            this.count = count;
+        }
+
+        public long getTimestamp() {
+            return timestamp;
+        }
+
+        public void setTimestamp(long timestamp) {
+            this.timestamp = timestamp;
+        }
+
+        public void incrementCount() {
+            this.count++;
+        }
+    }
+}
+
+   
+
+How would you ensure that the notification system (Email, SMS, WhatsApp) is asynchronous so that it doesn't block the main request handling process?
+1. Use @Async Annotation in Spring
+You can make the sendWhatsAppMessage method in your TwilioService asynchronous by annotating it with @Async. Spring will execute this method in a separate thread, allowing the main request to complete without waiting for the message-sending process.
+
+Updated TwilioService Class:
+java
+Copy
+Edit
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.stereotype.Service;
+
+@Service
+public class TwilioService {
+
+    @Value("${twilio.whatsapp.from}")
+    private String fromWhatsApp;
+
+    @Async
+    public void sendWhatsAppMessage(String to, String messageBody) {
+        Message message = Message.creator(
+                new PhoneNumber("whatsapp:" + to), // Customer's WhatsApp number
+                new PhoneNumber("whatsapp:" + fromWhatsApp), // Your Twilio WhatsApp-enabled number
+                messageBody
+        ).create();
+
+        System.out.println("Message sent with SID: " + message.getSid());
+    }
+}
+Enabling Async Support:
+In your Spring Boot application, enable asynchronous execution by adding the @EnableAsync annotation to your main application class.
+
+java
+Copy
+Edit
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.scheduling.annotation.EnableAsync;
+
+@SpringBootApplication
+@EnableAsync
+public class YourApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(YourApplication.class, args);
+    }
+}
+2. Use a Messaging Queue (Optional for Scalability)
+If you need more scalability, you can integrate a message broker like RabbitMQ, ActiveMQ, or Kafka to handle notifications. However, since you mentioned you're not using Kafka, this step is optional.
+
+Updated allocate Endpoint with Asynchronous Notification
+The updated allocate method remains unchanged, as the @Async annotation ensures that the notification process is non-blocking:
+
+java
+Copy
+Edit
+@PutMapping("/allocate")
+public ResponseEntity<String> allocate(@RequestParam int agentid, @RequestParam long cid) {
+    Agent agent = agentRepository.findById((long) agentid).orElseThrow(() -> 
+        new RuntimeException("Agent not found"));
+
+    CustomerVisit customerVisit = customerVisitRepository.findById(cid).orElseThrow(() -> 
+        new RuntimeException("Customer Visit not found"));
+
+    customerVisit.setAgent(agent);
+    customerVisitRepository.save(customerVisit);
+
+    // This will now run asynchronously
+    twilioService.sendWhatsAppMessage("+917051858967", "Agent has been allocated.");
+
+    return new ResponseEntity<>("Agent allocated successfully", HttpStatus.OK);
+}
+Advantages of This Approach
+Non-Blocking Requests:
+
+The main thread doesn't wait for the notification process to complete, improving request handling speed.
+
+  What Happens Without Asynchronous Processing?
+When the sendWhatsAppMessage method is called in your allocate endpoint:
+
+The main thread (handling the HTTP request) waits for the Twilio API call to complete before it can return a response to the client.
+
+If the Twilio API is slow or encounters delays (e.g., network latency, server issues), the client will have to wait longer for the response.
+
+If multiple requests come in simultaneously, all threads may get stuck waiting, reducing the application's capacity to handle more users.
+
+
+
+
+
+
+How would you handle retry logic in case a notification fails to send? Would you use a queue system, and if so, how?
+1. Without a Queue System: Simple Retry Logic
+You can implement retry logic directly in your TwilioService using a loop or a retry library like Spring Retry.
+
+Using Spring Retry
+Spring Retry provides an easy way to retry a failed operation.
+
+Add Dependency: Add the Spring Retry dependency in your pom.xml:
+
+xml
+Copy
+Edit
+<dependency>
+    <groupId>org.springframework.retry</groupId>
+    <artifactId>spring-retry</artifactId>
+</dependency>
+Configure Retry Logic: Annotate the sendWhatsAppMessage method with @Retryable.
+
+java
+Copy
+Edit
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Retryable;
+import org.springframework.stereotype.Service;
+
+@Service
+public class TwilioService {
+
+    @Value("${twilio.whatsapp.from}")
+    private String fromWhatsApp;
+
+    @Retryable(
+        value = Exception.class,
+        maxAttempts = 3,
+        backoff = @Backoff(delay = 2000) // Wait 2 seconds between retries
+    )
+    public void sendWhatsAppMessage(String to, String messageBody) {
+        Message message = Message.creator(
+            new PhoneNumber("whatsapp:" + to), // Customer's WhatsApp number
+            new PhoneNumber("whatsapp:" + fromWhatsApp), // Twilio number
+            messageBody
+        ).create();
+
+        System.out.println("Message sent with SID: " + message.getSid());
+    }
+}
+Enable Retry: Add @EnableRetry to your main application class.
+
+java
+Copy
+Edit
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.retry.annotation.EnableRetry;
+
+@SpringBootApplication
+@EnableRetry
+public class YourApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(YourApplication.class, args);
+    }
+}
+What Happens?
+If sendWhatsAppMessage fails, it will automatically retry up to 3 times with a 2-second delay between attempts.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
