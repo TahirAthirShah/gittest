@@ -579,6 +579,107 @@ If sendWhatsAppMessage fails, it will automatically retry up to 3 times with a 2
 
 
 
+Interviewer: How do you handle invalid or conflicting date/time selections when sellers book evaluation appointments?
+
+You:
+
+When handling date/time selections for evaluation appointments, it is essential to ensure that the chosen time is both valid and does not conflict with other appointments or system constraints. Here's how I approached this:
+
+Date/Time Validation:
+
+Format Validation: First, I ensured the selected date/time follows the correct format (e.g., ISO 8601) and that it's not in the past. If a seller tries to select a date/time in the past, the API responds with a 400 Bad Request status and a meaningful error message such as:
+"Preferred date/time cannot be in the past."
+
+Boundary Checks: I also set boundaries for how far in advance the seller can schedule the evaluation. For example, a seller might only be allowed to book an evaluation within a 30-day window, and I ensure this is checked in the backend. If the date is outside the allowed range, the API returns an error like:
+"The evaluation appointment must be scheduled within the next 30 days."
+
+Conflict Detection:
+
+Slot Availability Check: Before finalizing the appointment, I check the availability of the seller's preferred date/time. I compare it with existing appointments in the system for that particular evaluation type (e.g., home visit or online evaluation).
+
+I check the evaluationDateTime field in the database to see if another booking exists for the same seller and evaluation type within a specific time window (e.g., 2-hour buffer).
+
+If there’s a conflict (i.e., another appointment already exists within that time frame), the system responds with a conflict error:
+
+json
+Copy
+Edit
+{
+  "message": "The selected date/time is already taken. Please choose a different time.",
+  "conflictingAppointmentId": 789
+}
+In such cases, I allow sellers to either pick a new time or propose a range of alternative available time slots based on system availability.
+
+Time Zone Handling:
+
+To avoid issues with sellers booking appointments across different time zones, I ensured the system handles time zones correctly. I store all times in UTC in the database and convert them to the seller's local time when presenting available slots or confirming a booking. This prevents confusion related to time zone discrepancies.
+
+User-Friendly Feedback:
+
+If the date/time selection is invalid or conflicts with an existing appointment, the system provides user-friendly feedback with suggested next steps. For example, if the seller picks a time that is too close to an existing appointment, the API might respond with:
+
+json
+Copy
+Edit
+{
+  "message": "This time is already taken. Would you like to select an alternative time from the available slots?"
+}
+This approach helps sellers make informed decisions and avoids frustration.
+
+By implementing these checks and providing clear, actionable feedback to sellers, I was able to ensure that date/time selections were both valid and conflict-free, improving the user experience while keeping the scheduling system consistent and reliable.
+
+
+
+Did you implement any form of input validation or data sanitization on the inputs from the sellers (e.g., checking the date format or future appointments)?
+1. Input Validation
+Date Format Validation:
+I enforced a specific date format (YYYY-MM-DD) for the input. This was checked both on the client side and in the backend to ensure uniformity. If the format was invalid, the API would return a 400 Bad Request status with a message like:
+
+json
+Copy
+Edit
+{
+  "message": "Invalid date format. Please use 'YYYY-MM-DD'."
+}
+Future Appointments:
+I ensured that sellers could only book appointments for future dates. Any attempt to book a past date would result in a 400 Bad Request response with a message like:
+
+json
+Copy
+Edit
+{
+  "message": "The appointment date must be in the future."
+}
+
+
+
+
+
+
+Did you implement any form of input validation or data sanitization on the inputs from the sellers (e.g., checking the date format or future appointments)?
+asnwer as interviewee simple words
+
+
+ChatGPT said:
+Yes, I implemented input validation and data sanitization to ensure the inputs from sellers were correct and secure.
+
+Date Format Validation: I used annotations like @DateTimeFormat to ensure the date inputs followed the required format, such as yyyy-MM-dd. This prevented incorrect date formats from being processed.
+
+Future Appointments: I added logic to check if the provided date was in the future and within an allowed range, like within the next 30 days. If the date was invalid, the system returned a clear error message, like "The appointment date must be within the next 30 days."
+
+Sanitization: I used libraries like Hibernate to sanitize inputs, preventing harmful code like SQL injections or scripts. Hibernate and Prepared Statements automatically prevent SQL injection by binding user inputs to query parameters, rather than inserting them directly into SQL.  fo rthis we use parametrized quers
+
+
+Why These Codes?
+200 OK is a standard response when the request is successful.
+
+201 Created is specific for when a new resource is successfully created.
+
+400 Bad Request and 404 Not Found are used to clearly indicate client-side issues or invalid requests.
+
+409 Conflict is ideal for situations where the request cannot be completed due to a conflict with the existing resource state.
+
+500 Internal Server Error is used when there's an unexpected error on the server side.
 
 
 
@@ -586,9 +687,457 @@ If sendWhatsAppMessage fails, it will automatically retry up to 3 times with a 2
 
 
 
+Interviewer: How did you design the scheduling logic to allow sellers to pick their preferred evaluation date and time, while ensuring there are no conflicts?
+
+You (Interviewee):
+
+To handle scheduling and prevent conflicts, We designed the system to only show available time slots to the sellers. Here’s how I approached it:
+
+Working Hours Definition: I first defined the working hours for car evaluation appointments, for example, from 9 AM to 5 PM.
+
+Get Existing Bookings: Before showing the available time slots to sellers, I queried the database for existing bookings on the selected date to ensure I don’t show any time slots that are already booked.
+
+Generate Available Slots: Based on the working hours, I dynamically generated time slots in hourly intervals (e.g., 9:00 AM, 10:00 AM, etc.) and checked each slot to ensure it wasn’t already taken.
+
+Avoid Conflicts: For each slot, I compared the requested time with the existing bookings. If the time was already occupied, I excluded that slot from the available options.
+
+Display to Seller: Finally, I sent only the available slots to the frontend. The seller could then pick a time slot from the available ones, ensuring there would be no double bookings.
+
+This way, sellers could only choose from time slots that were not already booked, and there was no risk of scheduling conflicts.
 
 
 
+
+
+You (Interviewee):
+
+To prevent two sellers from booking the same time slot for their car evaluation, I handle it in the following way:
+
+Check Availability First: Before confirming the booking, I check whether the time slot the seller chooses is still available in the system.
+
+Immediate Availability Check: Once the seller picks a time, I quickly check the database to make sure that the slot hasn’t already been booked by someone else in the meantime. If it’s still available, I confirm the booking. If not, I let the seller know the slot is taken and ask them to pick another one.
+
+User-Friendly Message: If the selected slot is no longer available, I show a clear message like: "The time slot you selected is no longer available. Please choose another slot."
+
+
+
+
+
+1. Create a .env File
+In your project's root directory, create a file named .env.
+
+Add your sensitive credentials to this file in KEY=VALUE format.
+
+Example .env file:
+
+plaintext
+Copy
+Edit
+TWILIO_ACCOUNT_SID=your_account_sid_here
+TWILIO_AUTH_TOKEN=your_auth_token_here
+TWILIO_PHONE_NUMBER=your_phone_number_here
+2. Add .env to .gitignore
+To prevent the .env file from being accidentally pushed to version control systems (e.g., GitHub), add it to your .gitignore file.
+
+Example .gitignore:
+
+plaintext
+Copy
+Edit
+.env
+3. Load Environment Variables in Your Application
+For Spring Boot
+Add a dependency like spring-dotenv or use the built-in support for environment variables.
+
+Access variables using @Value or System.getenv().
+
+Example:
+
+java
+Copy
+Edit
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+
+@Component
+public class TwilioConfig {
+
+    @Value("${TWILIO_ACCOUNT_SID}")
+    private String accountSid;
+
+    @Value("${TWILIO_AUTH_TOKEN}")
+    private String authToken;
+
+    @Value("${TWILIO_PHONE_NUMBER}")
+    private String phoneNumber;
+
+    public void initTwilio() {
+        System.out.println("Account SID: " + accountSid);
+    }
+}
+Using Spring Boot's application.properties
+You can map .env variables to Spring Boot's configuration using application.properties:
+
+properties
+Copy
+Edit
+twilio.accountSid=${TWILIO_ACCOUNT_SID}
+twilio.authToken=${TWILIO_AUTH_TOKEN}
+twilio.phoneNumber=${TWILIO_PHONE_NUMBER}    
+
+
+
+
+%-------------------------
+% Resume in Latex
+% Author : Jake Gutierrez
+% Based off of: https://github.com/sb2nov/resume
+% License : MIT
+%------------------------
+
+\documentclass[letterpaper,11pt]{article}
+
+\usepackage{latexsym}
+\usepackage[empty]{fullpage}
+\usepackage{titlesec}
+\usepackage{marvosym}
+\usepackage[usenames,dvipsnames]{color}
+\usepackage{verbatim}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+\usepackage{fancyhdr}
+\usepackage[english]{babel}
+\usepackage{tabularx}
+\usepackage{fontawesome5}
+\usepackage{multicol}
+\setlength{\multicolsep}{-3.0pt}
+\setlength{\columnsep}{-1pt}
+\input{glyphtounicode}
+
+
+%----------FONT OPTIONS----------
+% sans-serif
+% \usepackage[sfdefault]{FiraSans}
+% \usepackage[sfdefault]{roboto}
+% \usepackage[sfdefault]{noto-sans}
+% \usepackage[default]{sourcesanspro}
+
+% serif
+% \usepackage{CormorantGaramond}
+% \usepackage{charter}
+
+
+\pagestyle{fancy}
+\fancyhf{} % clear all header and footer fields
+\fancyfoot{}
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0pt}
+
+% Adjust margins
+\addtolength{\oddsidemargin}{-0.6in}
+\addtolength{\evensidemargin}{-0.5in}
+\addtolength{\textwidth}{1.19in}
+\addtolength{\topmargin}{-.7in}
+\addtolength{\textheight}{1.4in}
+
+\urlstyle{same}
+
+\raggedbottom
+\raggedright
+\setlength{\tabcolsep}{0in}
+
+% Sections formatting
+\titleformat{\section}{
+  \vspace{-4pt}\scshape\raggedright\large\bfseries
+}{}{0em}{}[\color{black}\titlerule \vspace{-5pt}]
+
+% Ensure that generate pdf is machine readable/ATS parsable
+\pdfgentounicode=1
+
+%-------------------------
+% Custom commands
+\newcommand{\resumeItem}[1]{
+  \item\small{
+    {#1 \vspace{-2pt}}
+  }
+}
+
+\newcommand{\classesList}[4]{
+    \item\small{
+        {#1 #2 #3 #4 \vspace{-2pt}}
+  }
+}
+
+\newcommand{\resumeSubheading}[4]{
+  \vspace{-2pt}\item
+    \begin{tabular*}{1.0\textwidth}[t]{l@{\extracolsep{\fill}}r}
+      \textbf{#1} & \textbf{\small #2} \\
+      \textit{\small#3} & \textit{\small #4} \\
+    \end{tabular*}\vspace{-7pt}
+}
+
+\newcommand{\resumeSubSubheading}[2]{
+    \item
+    \begin{tabular*}{0.97\textwidth}{l@{\extracolsep{\fill}}r}
+      \textit{\small#1} & \textit{\small #2} \\
+    \end{tabular*}\vspace{-7pt}
+}
+
+\newcommand{\resumeProjectHeading}[2]{
+    \item
+    \begin{tabular*}{1.001\textwidth}{l@{\extracolsep{\fill}}r}
+      \small#1 & \textbf{\small #2}\\
+    \end{tabular*}\vspace{-7pt}
+}
+
+\newcommand{\resumeSubItem}[1]{\resumeItem{#1}\vspace{-4pt}}
+
+\renewcommand\labelitemi{$\vcenter{\hbox{\tiny$\bullet$}}$}
+\renewcommand\labelitemii{$\vcenter{\hbox{\tiny$\bullet$}}$}
+
+\newcommand{\resumeSubHeadingListStart}{\begin{itemize}[leftmargin=0.0in, label={}]}
+\newcommand{\resumeSubHeadingListEnd}{\end{itemize}}
+\newcommand{\resumeItemListStart}{\begin{itemize}}
+\newcommand{\resumeItemListEnd}{\end{itemize}\vspace{-5pt}}
+
+%-------------------------------------------
+%%%%%%  RESUME STARTS HERE  %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+\begin{document}
+
+%----------HEADING----------
+% \begin{tabular*}{\textwidth}{l@{\extracolsep{\fill}}r}
+%   \textbf{\href{http://sourabhbajaj.com/}{\Large Sourabh Bajaj}} & Email : \href{mailto:sourabh@sourabhbajaj.com}{sourabh@sourabhbajaj.com}\\
+%   \href{http://sourabhbajaj.com/}{http://www.sourabhbajaj.com} & Mobile : +1-123-456-7890 \\
+% \end{tabular*}
+
+\begin{center}
+    {\Huge \scshape Tahir Athir Shah} \\ \vspace{1pt}
+    Java Backend Developer \\ \vspace{1pt}
+    \small \raisebox{-0.1\height}\faPhone\ +91 70518 58967   ~ \href{mailto:smriti.7377@gmail.com}{\raisebox{-0.2\height}\faEnvelope\  \underline{
+    tahirathirshah@gmail.com
+    }} ~  \faMapMarker\ Bengaluru, India \\
+    \vspace{-8pt}
+  
+    % \href{https://linkedin.com/in//}{\raisebox{-0.2\height}\faLinkedin\ \underline{linkedin.com/in/username}}  ~
+    % \href{https://github.com/}{\raisebox{-0.2\height}\faGithub\ \underline{github.com/username}}
+    \vspace{-8pt}
+\end{center}
+
+\section*{Summary}
+\begin{itemize}[leftmargin=0.15in, label={}]
+    \item{
+        Experienced Java Backend Developer with over 3 years of experience in building web applications using Spring Boot, MVC Architecture, Spring Security, RESTful APIs, Hibernate ORM, and MySQL. Skilled in designing and implementing robust backend solutions, ensuring scalability and performance in various applications.
+    }
+    \item{
+        Currently exploring and implementing DevOps practices and AWS cloud services, including EC2, S3, RDS, IAM, and VPC. Familiar with Apache Kafka, proficient in version control using Git/GitHub, and experienced in agile development methodologies with JIRA.
+    }
+\end{itemize}
+
+
+
+
+%-----------TECHNICAL SKILLS-----------
+\section{Technical Skills}
+\begin{itemize}[leftmargin=0.15in, label={}]
+  \small{\item{
+    \vspace{1pt}
+    \textbf{Languages}{: Core Java, Java 8, SQL.} \\
+    \vspace{1pt}
+    \textbf{Frameworks and Libraries}{: Spring Boot, Spring MVC, Spring Data JPA, Hibernate ORM.} \\
+    \vspace{1pt}
+    \textbf{Databases}{: MySQL, Relational Databases} \\
+    \vspace{1pt}
+    \textbf{Cloud Services}{: Amazon Web Services (AWS) , Pre-signed URLs, Cloud Storage.} \\
+    \vspace{1pt}
+    \textbf{DevOps and CI/CD}{: Jenkins, Maven, Git, GitHub, Deployment Automation.} \\
+    \vspace{1pt}
+    \textbf{Development Practices}{: RESTful API Development, Microservices, MVC Architecture, Agile (Scrum), Version Control.} \\
+    \vspace{1pt}
+    \textbf{Security}{: JWT, RBAC, Spring Security, BCrypt, OTP Authentication.} \\
+    \vspace{1pt}
+    \textbf{Tools and Platforms}{: IntelliJ IDEA, Postman, Kafka, Swagger} \\
+    \vspace{1pt}
+    \textbf{Skills}{: Backend Development, API Integration} \\
+    \vspace{1pt}
+    \textbf{Soft Skills}{: Communication, Team Collaboration, Problem Solving, Conflict Resolution, Adaptability.} \\
+  }}
+\end{itemize}
+\vspace{-16pt}
+
+
+% %------RELEVANT COURSEWORK-------
+% \section{Relevant Coursework}
+%     %\resumeSubHeadingListStart
+%         \begin{multicols}{4}
+%             \begin{itemize}[itemsep=-5pt, parsep=3pt]
+%                 \item\small Data Structures
+%                 \item Software Methodology
+%                 \item Algorithms Analysis
+%                 \item Database Management
+%                 \item Artificial Intelligence
+%                 \item Internet Technology
+%                 \item Systems Programming
+%                 \item Computer Architecture
+%             \end{itemize}
+%         \end{multicols}
+%         \vspace*{2.0\multicolsep}
+%     %\resumeSubHeadingListEnd
+
+
+%-----------EXPERIENCE-----------
+\section{Experience}
+  \resumeSubHeadingListStart
+
+    \resumeSubheading
+      {Java Backend Developer}{September 2024 -- Present}
+      {Soliton Technologies.}{}
+      \resumeItemListStart
+      \resumeItem{Designed and implemented an \textbf{MVC architecture} using Java, Spring Boot and MySQL, demonstrating expertise in backend development}
+        \resumeItem{Implemented robust RBAC for API endpoints using \textbf{Spring Security} and JWT, integrating user \textbf{authentication} and \textbf{authorization} mechanisms to ensure secure access.}
+        \resumeItem{Integrated AWS S3 for secure storage of car images, providing reliable access through public URLs.}
+      \resumeItem{Utilized Spring MVC for mapping HTTP requests and designing endpoints following standard HTTP methods (GET, POST, PUT, DELETE).}
+      \resumeItemListEnd
+
+    \resumeSubheading
+      {Technical advisor} {April 2024 - August 2024}
+      {Concentrix 
+}{}
+      \resumeItemListStart
+        \resumeItem{Contributed to the Backend development as a key team member, utilizing Spring Boot 3 and Spring Security 6. Integrated JWT-based authentication under senior guidance, ensuring secure admin and customer access.}
+        \resumeItem{Implemented MVC architecture to design modular and scalable backend components, improving code maintainability and fostering team collaboration.}
+        % \resumeItem{Collaborated with team members using version control systems such as Git to organize modifications and assign tasks.}
+    \resumeItemListEnd
+     \resumeSubheading
+      {Junior Java Developer} {April 2022 --  March 2024}
+      {ScalaCode}{}
+      \resumeItemListStart
+        \resumeItem{Contributed to the development of backend services and APIs using Java and related technologies, under the guidance of senior developers, to support the company's software products.}
+        \resumeItem{Actively engaged in learning and professional development activities, such as attending training sessions and workshops, to enhance skills and knowledge in Java development.}
+        \resumeItem{Implemented Spring Data JPA and \textbf{Hibernate} for efficient database management, designing entity classes, creating repositories for CRUD operations, and writing JPQL queries, ensuring data integrity and efficiency.}
+        \resumeItem{Developed and integrated \textbf{RESTful APIs} in collaboration with the front-end team, resulting in a 20\% boost in user satisfaction.}
+        \resumeItem{Built comprehensive product management functionality, allowing admins to post, update, and delete products
+efficiently}
+    \resumeItemListEnd
+    
+  \resumeSubHeadingListEnd
+\vspace{-16pt}
+
+
+% %-----------PROJECTS-----------
+% \section{Projects}
+%     \vspace{-5pt}
+%     \resumeSubHeadingListStart
+%       \resumeProjectHeading
+%           {\textbf{Gym Reservation Bot} $|$ \emph{Python, Selenium, Google Cloud Console}}{January 2021}
+%           \resumeItemListStart
+%             \resumeItem{Developed an automatic bot using Python and Google Cloud Console to register myself for a timeslot at my school gym.}
+%             \resumeItem{Implemented Selenium to create an instance of Chrome in order to interact with the correct elements of the web page.}
+%             \resumeItem{Created a Linux virtual machine to run on Google Cloud so that the program is able to run everyday from the cloud.}
+%             \resumeItem{Used Cron to schedule the program to execute automatically at 11 AM every morning so a reservation is made for me.}
+%           \resumeItemListEnd
+%           \vspace{-13pt}
+%       \resumeProjectHeading
+%           {\textbf{Ticket Price Calculator App} $|$ \emph{Java, Android Studio}}{November 2020}
+%           \resumeItemListStart
+%             \resumeItem{Created an Android application using Java and Android Studio to calculate ticket prices for trips to museums in NYC.}
+%             \resumeItem{Processed user inputted information in the back-end of the app to return a subtotal price based on the tickets selected.}
+%             \resumeItem{Utilized the layout editor to create a UI for the application in order to allow different scenes to interact with each other.}
+%           \resumeItemListEnd 
+%           \vspace{-13pt}
+%           \resumeProjectHeading
+%           {\textbf{Transaction Management GUI} $|$ \emph{Java, Eclipse, JavaFX}}{October 2020}
+%           \resumeItemListStart
+%             \resumeItem{Designed a sample banking transaction system using Java to simulate the common functions of using a bank account.}
+%             \resumeItem{Used JavaFX to create a GUI that supports actions such as creating an account, deposit, withdraw, list all acounts, etc.}
+%             \resumeItem{Implemented object-oriented programming practices such as inheritance to create different account types and databases.}
+%           \resumeItemListEnd 
+%     \resumeSubHeadingListEnd
+% \vspace{-15pt}
+
+
+%
+%-----------EDUCATION-----------
+\section{Education}
+  \resumeSubHeadingListStart
+    \resumeSubheading
+      {University of Kashmir}{2020 -- 2023}
+      {Bachelor of Computer Application  (BCA)}{}
+  \resumeSubHeadingListEnd
+%-----------PROJECTS-----------
+\section{Projects}
+\resumeSubHeadingListStart
+
+  \resumeProjectHeading
+    {\textbf{TrueCar} $|$ \emph{Java, Spring Boot, Spring Security, Hibernate, MySQL, AWS (S3, EC2), JWT, Twilio, Maven}}{Oct 2024 – Present}
+
+    % First module: User Authentication & Authorization Module
+    \vspace{2pt}
+    \textbf{1. User Authentication \& Authorization}
+    \vspace{2pt}
+    \resumeItemListStart
+      \resumeItem{Integrated \textbf{Spring Security} with \textbf{JWT} (JSON Web Tokens) for secure, stateless authentication across all user-related APIs, ensuring that each request is authenticated and authorized before access.}
+      \resumeItem{Implemented \textbf{role-based access control (RBAC)} to define user roles (Admin, Evaluation Executive, CRM Team, and Customer) and provide appropriate access levels to various resources and functionalities.}
+      \resumeItem{Configured \textbf{password encryption using BCrypt} to ensure sensitive data protection during user login and registration processes.}
+      \resumeItem{Developed role-based endpoint access to restrict specific API routes based on user roles, ensuring only authorized users can perform specific actions.}
+      \resumeItem{Integrated \textbf{JWT expiration handling} to enhance security by automatically invalidating expired tokens.}
+      \resumeItem{Improved system security by implementing \textbf{CORS (Cross-Origin Resource Sharing)} policies to restrict access from unauthorized domains.}
+    \resumeItemListEnd
+
+    % Second module: Car Evaluation Booking
+    \vspace{2pt}
+    \textbf{2. Car Evaluation Booking}
+    \vspace{2pt}
+    \resumeItemListStart
+      \resumeItem{Built \textbf{REST APIs} to facilitate car evaluation appointment requests.}
+      \resumeItem{Provided flexible scheduling options, enabling sellers to choose their preferred evaluation date and time.}
+      \resumeItem{Implemented a multi-channel notification system using \textbf{Twilio} (SMS and WhatsApp) to confirm booking appointments.}
+    \resumeItemListEnd
+
+    % Third module: Car Listing & Inventory Management
+    \vspace{2pt}
+    \textbf{3. Listing \& Inventory Management}
+    \vspace{2pt}
+    \resumeItemListStart
+      \resumeItem{Developed REST APIs to efficiently manage vehicle listings, supporting operations such as addition, updates, filtering, and deletion for streamlined inventory management.}
+      \resumeItem{Integrated \textbf{AWS S3} for secure photo uploads, enabling reliable storage and access to car images via public URLs.}
+      \resumeItem{Handled photo uploads by integrating AWS S3 – stored car images securely and returned public access URLs in response.}
+      \resumeItem{Added metadata handling and linked image URLs to each car in the database.}
+    \resumeItemListEnd
+
+    % Fourth module: Booking & Test Drive Scheduling
+    \vspace{2pt}
+    \textbf{4. Booking \& Test Drive Scheduling}
+    \vspace{2pt}
+    \resumeItemListStart
+      \resumeItem{Built APIs for test drive requests, availability checking, and booking confirmation.}
+      \resumeItem{Sent real-time confirmations via email, SMS, and WhatsApp using third-party services.}
+    \resumeItemListEnd
+
+    % Fifth module: Search & Filtering
+    \vspace{2pt}
+    \textbf{5. Search \& Filtering}
+    \vspace{2pt}
+    \resumeItemListStart
+      \resumeItem{Developed APIs to search vehicles by price range, brand, mileage, and other attributes.}
+      \resumeItem{Implemented pagination and sorting to enhance the user experience and reduce server load.}
+    \resumeItemListEnd
+
+    % Sixth module: API Testing & Documentation with Swagger
+    \vspace{2pt}
+    \textbf{6. API Testing \& Documentation with Swagger}
+    \vspace{2pt}
+    \resumeItemListStart
+      \resumeItem{Implemented \textbf{Swagger UI} for interactive API documentation, simplifying exploration with detailed specifications and response models.}
+      \resumeItem{Performed thorough API testing using \textbf{JUnit} and \textbf{Mockito}, ensuring functionality, stability, and backward compatibility.}
+    \resumeItemListEnd
+
+\resumeSubHeadingListEnd
+
+
+%
+\end{document}
 
 
 
